@@ -1,0 +1,209 @@
+version: '3.8'
+
+services:
+  # Database Services
+  postgres:
+    image: postgres:14
+    container_name: dr_assistant_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dr_assistant
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - dr_assistant_network
+
+  mongodb:
+    image: mongo:5
+    container_name: dr_assistant_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo
+      MONGO_INITDB_ROOT_PASSWORD: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - dr_assistant_network
+
+  redis:
+    image: redis:6
+    container_name: dr_assistant_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - dr_assistant_network
+
+  # API Gateway
+  api_gateway:
+    build:
+      context: ./backend/api_gateway
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_api_gateway
+    ports:
+      - "8000:8000"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./backend/api_gateway:/app
+      - /app/node_modules
+    depends_on:
+      - auth_service
+    networks:
+      - dr_assistant_network
+
+  # Core Services
+  auth_service:
+    build:
+      context: ./backend/auth_service
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_auth_service
+    ports:
+      - "8001:8001"
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: dr_assistant
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    volumes:
+      - ./backend/auth_service:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - dr_assistant_network
+
+  user_service:
+    build:
+      context: ./backend/user_service
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_user_service
+    ports:
+      - "8002:8002"
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: dr_assistant
+    volumes:
+      - ./backend/user_service:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    networks:
+      - dr_assistant_network
+
+  patient_service:
+    build:
+      context: ./backend/patient_service
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_patient_service
+    ports:
+      - "8003:8003"
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: dr_assistant
+      MONGODB_URI: mongodb://mongo:mongo@mongodb:27017/dr_assistant
+    volumes:
+      - ./backend/patient_service:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+      - mongodb
+    networks:
+      - dr_assistant_network
+
+  schedule_service:
+    build:
+      context: ./backend/schedule_service
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_schedule_service
+    ports:
+      - "8004:8004"
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: dr_assistant
+    volumes:
+      - ./backend/schedule_service:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    networks:
+      - dr_assistant_network
+
+  # AI Services
+  voice_transcription:
+    build:
+      context: ./ai_services/voice_transcription
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_voice_transcription
+    ports:
+      - "9001:9001"
+    environment:
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - ./ai_services/voice_transcription:/app
+    networks:
+      - dr_assistant_network
+
+  clinical_note_generation:
+    build:
+      context: ./ai_services/clinical_note_generation
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_clinical_note_generation
+    ports:
+      - "9002:9002"
+    environment:
+      PYTHONUNBUFFERED: 1
+      MONGODB_URI: mongodb://mongo:mongo@mongodb:27017/dr_assistant
+    volumes:
+      - ./ai_services/clinical_note_generation:/app
+    depends_on:
+      - mongodb
+    networks:
+      - dr_assistant_network
+
+  # Integration Services
+  abdm_integration:
+    build:
+      context: ./integration_services/abdm_integration
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_abdm_integration
+    ports:
+      - "8101:8101"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./integration_services/abdm_integration:/app
+      - /app/node_modules
+    networks:
+      - dr_assistant_network
+
+networks:
+  dr_assistant_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
