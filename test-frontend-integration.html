@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Integration Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .loading { background-color: #fff3cd; border-color: #ffeaa7; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Dr. Assistant Frontend Integration Test</h1>
+    
+    <div class="test-section">
+        <h2>Authentication Test</h2>
+        <button onclick="testLogin()">Test Login</button>
+        <button onclick="testCurrentUser()">Test Current User</button>
+        <div id="auth-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Patient Service Test</h2>
+        <button onclick="testPatients()">Test Get Patients</button>
+        <div id="patient-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Schedule Service Test</h2>
+        <button onclick="testAppointments()">Test Get Appointments</button>
+        <button onclick="testCreateAppointment()">Test Create Appointment</button>
+        <button onclick="testAvailability()">Test Get Availability</button>
+        <div id="schedule-result"></div>
+    </div>
+
+    <script>
+        let authToken = null;
+
+        async function testLogin() {
+            const resultDiv = document.getElementById('auth-result');
+            resultDiv.innerHTML = '<div class="loading">Testing login...</div>';
+            
+            try {
+                const response = await fetch('http://localhost:8020/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'testdoctor1',
+                        password: 'TestPassword123!'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    authToken = data.data.token;
+                    localStorage.setItem('token', authToken);
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Login Successful</h3>
+                            <p><strong>User:</strong> ${data.data.user.full_name}</p>
+                            <p><strong>Role:</strong> ${data.data.user.role}</p>
+                            <p><strong>Token:</strong> ${authToken.substring(0, 50)}...</p>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.error?.message || 'Login failed');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Login Failed</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function testCurrentUser() {
+            const resultDiv = document.getElementById('auth-result');
+            const token = authToken || localStorage.getItem('token');
+            
+            if (!token) {
+                resultDiv.innerHTML = '<div class="error">❌ No token available. Please login first.</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading">Testing current user...</div>';
+            
+            try {
+                const response = await fetch('http://localhost:8020/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Current User Retrieved</h3>
+                            <pre>${JSON.stringify(data.data.user, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.error?.message || 'Failed to get current user');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Current User Failed</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function testPatients() {
+            const resultDiv = document.getElementById('patient-result');
+            const token = authToken || localStorage.getItem('token');
+            
+            if (!token) {
+                resultDiv.innerHTML = '<div class="error">❌ No token available. Please login first.</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading">Testing patients...</div>';
+            
+            try {
+                const response = await fetch('http://localhost:8017/api/patients', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Patients Retrieved</h3>
+                            <p><strong>Total Patients:</strong> ${data.data.patients.length}</p>
+                            <pre>${JSON.stringify(data.data.patients.slice(0, 2), null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.error?.message || 'Failed to get patients');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Patients Failed</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function testAppointments() {
+            const resultDiv = document.getElementById('schedule-result');
+            const token = authToken || localStorage.getItem('token');
+            
+            if (!token) {
+                resultDiv.innerHTML = '<div class="error">❌ No token available. Please login first.</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading">Testing appointments...</div>';
+            
+            try {
+                const response = await fetch('http://localhost:8014/api/appointments', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Appointments Retrieved</h3>
+                            <p><strong>Total Appointments:</strong> ${data.data.appointments.length}</p>
+                            <pre>${JSON.stringify(data.data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.error?.message || 'Failed to get appointments');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Appointments Failed</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function testCreateAppointment() {
+            const resultDiv = document.getElementById('schedule-result');
+            const token = authToken || localStorage.getItem('token');
+            
+            if (!token) {
+                resultDiv.innerHTML = '<div class="error">❌ No token available. Please login first.</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading">Testing create appointment...</div>';
+            
+            try {
+                const appointmentData = {
+                    doctor_id: "88e7f74d-b266-45ab-8da1-3f16e5257057",
+                    patient_id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                    start_time: "2025-05-27T15:00:00.000Z",
+                    end_time: "2025-05-27T15:30:00.000Z",
+                    appointment_type: "routine",
+                    reason: "Frontend integration test",
+                    notes: "Testing appointment creation from frontend"
+                };
+
+                const response = await fetch('http://localhost:8014/api/appointments', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(appointmentData)
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Appointment Created</h3>
+                            <pre>${JSON.stringify(data.data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.error?.message || 'Failed to create appointment');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Create Appointment Failed</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function testAvailability() {
+            const resultDiv = document.getElementById('schedule-result');
+            const token = authToken || localStorage.getItem('token');
+            
+            if (!token) {
+                resultDiv.innerHTML = '<div class="error">❌ No token available. Please login first.</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="loading">Testing availability...</div>';
+            
+            try {
+                const response = await fetch('http://localhost:8014/api/availability/doctor/88e7f74d-b266-45ab-8da1-3f16e5257057', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Availability Retrieved</h3>
+                            <p><strong>Total Availabilities:</strong> ${data.data.length}</p>
+                            <pre>${JSON.stringify(data.data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.error?.message || 'Failed to get availability');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Availability Failed</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

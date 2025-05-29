@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0055FF">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <title>Dr. Assistant</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+    }
+    #error-display {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background-color: #ffdddd;
+      color: #ff0000;
+      padding: 10px;
+      z-index: 9999;
+      display: none;
+      white-space: pre-wrap;
+      overflow: auto;
+      max-height: 50vh;
+      border-bottom: 2px solid #ff0000;
+    }
+    #debug-info {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: #00ff00;
+      padding: 10px;
+      z-index: 9999;
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      overflow: auto;
+      max-height: 30vh;
+    }
+  </style>
+</head>
+<body>
+  <!-- Error display for debugging -->
+  <div id="error-display"></div>
+
+  <!-- Debug info display -->
+  <div id="debug-info"></div>
+
+  <!-- React root -->
+  <div id="root">
+    <!-- Fallback content in case React doesn't render -->
+    <div style="padding: 20px; text-align: center;">
+      <h1 style="color: #0055FF;">Dr. Assistant</h1>
+      <p>If you're seeing this message, React hasn't rendered properly.</p>
+      <p>Check the browser console for errors.</p>
+    </div>
+  </div>
+
+  <!-- Environment variables will be injected here by webpack -->
+  <script>
+    // Create window._env_ object to store environment variables
+    window._env_ = {
+      REACT_APP_API_URL: 'http://localhost:8020/api',
+      REACT_APP_AUTH_API_URL: 'http://localhost:8020',
+      REACT_APP_MOCK_AUTH: 'false',
+      REACT_APP_USE_MOCK_SERVICES: 'false'
+    };
+
+    // Debug logging function
+    function debugLog(message) {
+      const debugInfo = document.getElementById('debug-info');
+      const timestamp = new Date().toISOString();
+      debugInfo.innerHTML += `[${timestamp}] ${message}<br>`;
+      console.log(`[${timestamp}] ${message}`);
+    }
+
+    // Log initial page load
+    debugLog('Page loaded');
+    debugLog(`User Agent: ${navigator.userAgent}`);
+
+    // Log when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+      debugLog('DOM fully loaded');
+    });
+
+    // Log when window is fully loaded
+    window.addEventListener('load', function() {
+      debugLog('Window fully loaded');
+
+      // Check if React has rendered anything
+      const root = document.getElementById('root');
+      const rootChildren = root.children;
+      debugLog(`Root element has ${rootChildren.length} children`);
+
+      // Check if any scripts failed to load
+      const scripts = document.getElementsByTagName('script');
+      debugLog(`${scripts.length} scripts on page`);
+
+      // Check for React and ReactDOM
+      debugLog(`React defined: ${typeof React !== 'undefined'}`);
+      debugLog(`ReactDOM defined: ${typeof ReactDOM !== 'undefined'}`);
+    });
+
+    // Error handling to display errors on screen
+    window.addEventListener('error', function(event) {
+      debugLog(`ERROR: ${event.message}`);
+
+      const errorDisplay = document.getElementById('error-display');
+      errorDisplay.style.display = 'block';
+      errorDisplay.innerHTML += `<strong>ERROR:</strong> ${event.message}<br>
+                                <strong>File:</strong> ${event.filename}<br>
+                                <strong>Line:</strong> ${event.lineno}<br>
+                                <strong>Column:</strong> ${event.colno}<br>
+                                <strong>Stack:</strong> ${event.error?.stack || 'No stack trace'}<br><hr>`;
+    });
+
+    // Also catch unhandled promise rejections
+    window.addEventListener('unhandledrejection', function(event) {
+      debugLog(`UNHANDLED PROMISE REJECTION: ${event.reason}`);
+
+      const errorDisplay = document.getElementById('error-display');
+      errorDisplay.style.display = 'block';
+      errorDisplay.innerHTML += `<strong>UNHANDLED PROMISE REJECTION:</strong> ${event.reason}<br>
+                                <strong>Stack:</strong> ${event.reason?.stack || 'No stack trace'}<br><hr>`;
+    });
+  </script>
+</body>
+</html>

@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: dr_assistant
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -23,7 +23,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: mongo
       MONGO_INITDB_ROOT_PASSWORD: mongo
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
       - mongodb_data:/data/db
     networks:
@@ -40,22 +40,22 @@ services:
       - dr_assistant_network
 
   # API Gateway
-  api_gateway:
-    build:
-      context: ./backend/api_gateway
-      dockerfile: Dockerfile.dev
-    container_name: dr_assistant_api_gateway
-    ports:
-      - "8000:8000"
-    environment:
-      NODE_ENV: development
-    volumes:
-      - ./backend/api_gateway:/app
-      - /app/node_modules
-    depends_on:
-      - auth_service
-    networks:
-      - dr_assistant_network
+  # api_gateway:
+  #   build:
+  #     context: ./backend/api_gateway
+  #     dockerfile: Dockerfile.dev
+  #   container_name: dr_assistant_api_gateway
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     NODE_ENV: development
+  #   volumes:
+  #     - ./backend/api_gateway:/app
+  #     - /app/node_modules
+  #   depends_on:
+  #     - auth_service
+  #   networks:
+  #     - dr_assistant_network
 
   # Core Services
   auth_service:
@@ -74,6 +74,7 @@ services:
       DB_NAME: dr_assistant
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
     volumes:
       - ./backend/auth_service:/app
       - /app/node_modules
@@ -97,11 +98,13 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: dr_assistant
+      AUTH_SERVICE_URL: http://auth_service:8001
     volumes:
       - ./backend/user_service:/app
       - /app/node_modules
     depends_on:
       - postgres
+      - auth_service
     networks:
       - dr_assistant_network
 
@@ -111,7 +114,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: dr_assistant_patient_service
     ports:
-      - "8003:8003"
+      - "8007:8007"
     environment:
       NODE_ENV: development
       DB_HOST: postgres
@@ -120,12 +123,16 @@ services:
       DB_PASSWORD: postgres
       DB_NAME: dr_assistant
       MONGODB_URI: mongodb://mongo:mongo@mongodb:27017/dr_assistant
+      AUTH_SERVICE_URL: http://auth_service:8001
+      USER_SERVICE_URL: http://user_service:8002
     volumes:
       - ./backend/patient_service:/app
       - /app/node_modules
     depends_on:
       - postgres
       - mongodb
+      - auth_service
+      - user_service
     networks:
       - dr_assistant_network
 
@@ -143,28 +150,155 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: dr_assistant
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URI: redis://redis:6379
     volumes:
       - ./backend/schedule_service:/app
       - /app/node_modules
     depends_on:
       - postgres
+      - redis
+    networks:
+      - dr_assistant_network
+
+  dashboard_service:
+    build:
+      context: ./backend/dashboard_service
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_dashboard_service
+    ports:
+      - "8005:8005"
+    environment:
+      NODE_ENV: development
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URI: redis://redis:6379
+      AUTH_SERVICE_URL: http://auth_service:8001
+      USER_SERVICE_URL: http://user_service:8002
+      PATIENT_SERVICE_URL: http://patient_service:8007
+      SCHEDULE_SERVICE_URL: http://schedule_service:8004
+    volumes:
+      - ./backend/dashboard_service:/app
+      - /app/node_modules
+    depends_on:
+      - redis
+      - auth_service
+      - user_service
+      - patient_service
+      - schedule_service
+    networks:
+      - dr_assistant_network
+
+  task_service:
+    build:
+      context: ./backend/task_service
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_task_service
+    ports:
+      - "8016:8016"
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: dr_assistant
+      AUTH_SERVICE_URL: http://auth_service:8001
+      USER_SERVICE_URL: http://user_service:8002
+    volumes:
+      - ./backend/task_service:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+      - auth_service
+      - user_service
+    networks:
+      - dr_assistant_network
+
+  # Sprint 4 Services
+  voice_recording_service:
+    build:
+      context: ./backend/voice_recording_service
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_voice_recording_service
+    ports:
+      - "8003:8003"
+    environment:
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongo:mongo@mongodb:27017/dr_assistant
+      AUTH_SERVICE_URL: http://auth_service:8001
+      GOOGLE_SPEECH_API_KEY: ${GOOGLE_SPEECH_API_KEY:-dummy_key}
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+    volumes:
+      - ./backend/voice_recording_service:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+      - auth_service
+    networks:
+      - dr_assistant_network
+
+  prescription_generation_service:
+    build:
+      context: ./ai_services/prescription_generation
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_prescription_generation
+    ports:
+      - "9003:9003"
+    environment:
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongo:mongo@mongodb:27017/dr_assistant
+      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-dummy_key}
+      AUTH_SERVICE_URL: http://auth_service:8001
+      CLINICAL_NOTE_SERVICE_URL: http://clinical_note_generation:9002
+      PATIENT_SERVICE_URL: http://patient_service:8007
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+    volumes:
+      - ./ai_services/prescription_generation:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+      - auth_service
+      - clinical_note_generation
+    networks:
+      - dr_assistant_network
+
+  # Frontend
+  frontend_web:
+    build:
+      context: ./frontend/web
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_frontend_web
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_AUTH_SERVICE_URL: http://localhost:8001
+      REACT_APP_VOICE_RECORDING_SERVICE_URL: http://localhost:8003
+      REACT_APP_ENABLE_VOICE_RECORDING: true
+      REACT_APP_ENABLE_AI_TRANSCRIPTION: true
+    volumes:
+      - ./frontend/web:/app
+      - /app/node_modules
     networks:
       - dr_assistant_network
 
   # AI Services
-  voice_transcription:
-    build:
-      context: ./ai_services/voice_transcription
-      dockerfile: Dockerfile.dev
-    container_name: dr_assistant_voice_transcription
-    ports:
-      - "9001:9001"
-    environment:
-      PYTHONUNBUFFERED: 1
-    volumes:
-      - ./ai_services/voice_transcription:/app
-    networks:
-      - dr_assistant_network
+  # voice_transcription:
+  #   build:
+  #     context: ./ai_services/voice_transcription
+  #     dockerfile: Dockerfile.dev
+  #   container_name: dr_assistant_voice_transcription
+  #   ports:
+  #     - "9001:9001"
+  #   environment:
+  #     PYTHONUNBUFFERED: 1
+  #   volumes:
+  #     - ./ai_services/voice_transcription:/app
+  #   networks:
+  #     - dr_assistant_network
 
   clinical_note_generation:
     build:
@@ -174,8 +308,11 @@ services:
     ports:
       - "9002:9002"
     environment:
+      NODE_ENV: development
       PYTHONUNBUFFERED: 1
       MONGODB_URI: mongodb://mongo:mongo@mongodb:27017/dr_assistant
+      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-dummy_key}
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
     volumes:
       - ./ai_services/clinical_note_generation:/app
     depends_on:
@@ -193,6 +330,12 @@ services:
       - "8101:8101"
     environment:
       NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: dr_assistant
+      AUTH_SERVICE_URL: http://auth_service:8001
     volumes:
       - ./integration_services/abdm_integration:/app
       - /app/node_modules

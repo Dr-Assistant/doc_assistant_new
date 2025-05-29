@@ -1,0 +1,198 @@
+version: '3.8'
+
+services:
+  # Database Services
+  postgres:
+    image: postgres:14
+    container_name: dr_assistant_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - dr_assistant_network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:5
+    container_name: dr_assistant_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - dr_assistant_network
+    restart: always
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:6
+    container_name: dr_assistant_redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - dr_assistant_network
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Gateway
+  api_gateway:
+    image: drassistant/api_gateway:latest
+    container_name: dr_assistant_api_gateway
+    environment:
+      - NODE_ENV=production
+      - PORT=8000
+      - AUTH_SERVICE_URL=http://auth_service:8001
+      - USER_SERVICE_URL=http://user_service:8002
+      - PATIENT_SERVICE_URL=http://patient_service:8003
+      - SCHEDULE_SERVICE_URL=http://schedule_service:8004
+      - VOICE_TRANSCRIPTION_URL=http://voice_transcription:9001
+      - CLINICAL_NOTE_GENERATION_URL=http://clinical_note_generation:9002
+      - ABDM_INTEGRATION_URL=http://abdm_integration:8101
+      - RATE_LIMIT_WINDOW_MS=60000
+      - RATE_LIMIT_MAX_REQUESTS=100
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - LOG_LEVEL=info
+    depends_on:
+      - auth_service
+      - user_service
+      - patient_service
+      - schedule_service
+    networks:
+      - dr_assistant_network
+    restart: always
+
+  # Core Services
+  auth_service:
+    image: drassistant/auth_service:latest
+    container_name: dr_assistant_auth_service
+    environment:
+      - NODE_ENV=production
+      - PORT=8001
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=1h
+      - REFRESH_TOKEN_EXPIRES_IN=7d
+      - LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - dr_assistant_network
+    restart: always
+
+  user_service:
+    image: drassistant/user_service:latest
+    container_name: dr_assistant_user_service
+    environment:
+      - NODE_ENV=production
+      - PORT=8002
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB}
+      - AUTH_SERVICE_URL=http://auth_service:8001
+      - LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dr_assistant_network
+    restart: always
+
+  patient_service:
+    image: drassistant/patient_service:latest
+    container_name: dr_assistant_patient_service
+    environment:
+      - NODE_ENV=production
+      - PORT=8003
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB}
+      - MONGODB_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/${MONGO_DB}?authSource=admin
+      - AUTH_SERVICE_URL=http://auth_service:8001
+      - LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - dr_assistant_network
+    restart: always
+
+  schedule_service:
+    image: drassistant/schedule_service:latest
+    container_name: dr_assistant_schedule_service
+    environment:
+      - NODE_ENV=production
+      - PORT=8004
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_NAME=${POSTGRES_DB}
+      - REDIS_URI=redis://redis:6379
+      - AUTH_SERVICE_URL=http://auth_service:8001
+      - USER_SERVICE_URL=http://user_service:8002
+      - PATIENT_SERVICE_URL=http://patient_service:8003
+      - LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - dr_assistant_network
+    restart: always
+
+  # Frontend
+  frontend_web:
+    image: drassistant/frontend-web:latest
+    container_name: dr_assistant_frontend_web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - api_gateway
+    networks:
+      - dr_assistant_network
+    restart: always
+
+networks:
+  dr_assistant_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:

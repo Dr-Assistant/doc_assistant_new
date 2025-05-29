@@ -1,0 +1,22 @@
+{
+  "name": "dr-assistant-database",
+  "version": "0.1.0",
+  "description": "Database infrastructure for Dr. Assistant application",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "jest",
+    "migrate": "node src/scripts/run-migrations.js",
+    "seed": "node src/scripts/seed-database.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "ioredis": "^5.3.2",
+    "mongodb": "^5.5.0",
+    "mongoose": "^7.2.0",
+    "pg": "^8.11.0",
+    "winston": "^3.8.2"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0"
+  }
+}

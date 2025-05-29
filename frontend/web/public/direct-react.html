@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Direct React Test</title>
+  <!-- Load React directly from CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #F5F7FA;
+    }
+    #app {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-top: 50px;
+    }
+    .header {
+      color: #0055FF;
+    }
+    .button {
+      background-color: #0055FF;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    #error-display {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background-color: #ffdddd;
+      color: #ff0000;
+      padding: 10px;
+      z-index: 9999;
+      display: none;
+      white-space: pre-wrap;
+      overflow: auto;
+      max-height: 50vh;
+      border-bottom: 2px solid #ff0000;
+    }
+    #debug-info {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: #00ff00;
+      padding: 10px;
+      z-index: 9999;
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      overflow: auto;
+      max-height: 30vh;
+    }
+  </style>
+</head>
+<body>
+  <!-- Error display for debugging -->
+  <div id="error-display"></div>
+  
+  <!-- Debug info display -->
+  <div id="debug-info"></div>
+  
+  <!-- React root -->
+  <div id="app"></div>
+
+  <script>
+    // Debug logging function
+    function debugLog(message) {
+      const debugInfo = document.getElementById('debug-info');
+      const timestamp = new Date().toISOString();
+      debugInfo.innerHTML += `[${timestamp}] ${message}<br>`;
+      console.log(`[${timestamp}] ${message}`);
+    }
+    
+    // Log initial page load
+    debugLog('Page loaded');
+    
+    // Error handling
+    window.addEventListener('error', function(event) {
+      debugLog(`ERROR: ${event.message}`);
+      
+      const errorDisplay = document.getElementById('error-display');
+      errorDisplay.style.display = 'block';
+      errorDisplay.innerHTML += `<strong>ERROR:</strong> ${event.message}<br>
+                                <strong>File:</strong> ${event.filename}<br>
+                                <strong>Line:</strong> ${event.lineno}<br>
+                                <strong>Column:</strong> ${event.colno}<br>
+                                <strong>Stack:</strong> ${event.error?.stack || 'No stack trace'}<br><hr>`;
+    });
+    
+    // Create a simple React component
+    function App() {
+      const [count, setCount] = React.useState(0);
+      
+      React.useEffect(() => {
+        debugLog('App component mounted');
+      }, []);
+      
+      debugLog('App component rendering');
+      
+      return React.createElement(
+        'div',
+        null,
+        React.createElement('h1', { className: 'header' }, 'Dr. Assistant Direct React Test'),
+        React.createElement('p', null, 'This is a direct React test without webpack or complex configuration.'),
+        React.createElement('p', null, `Button clicked ${count} times`),
+        React.createElement(
+          'button',
+          { 
+            className: 'button',
+            onClick: () => {
+              setCount(count + 1);
+              debugLog('Button clicked');
+            }
+          },
+          'Click Me'
+        )
+      );
+    }
+    
+    try {
+      debugLog('Starting to render React app');
+      
+      // Get the app element
+      const appElement = document.getElementById('app');
+      debugLog(`App element found: ${!!appElement}`);
+      
+      // Create root and render
+      const root = ReactDOM.createRoot(appElement);
+      debugLog('Root created');
+      
+      // Render the App component
+      root.render(React.createElement(App));
+      debugLog('App rendered');
+    } catch (error) {
+      debugLog(`Error rendering React app: ${error}`);
+      
+      const errorDisplay = document.getElementById('error-display');
+      errorDisplay.style.display = 'block';
+      errorDisplay.innerHTML += `<strong>RENDER ERROR:</strong> ${error}<br>
+                                <strong>Stack:</strong> ${error?.stack || 'No stack trace'}<br><hr>`;
+    }
+  </script>
+</body>
+</html>
