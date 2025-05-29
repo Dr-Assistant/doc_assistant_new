@@ -22,6 +22,7 @@
     "http-status-codes": "^2.2.0",
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.2.0",
+    "morgan": "^1.10.0",
     "pg": "^8.11.0",
     "sequelize": "^6.31.1",
     "uuid": "^9.0.0",

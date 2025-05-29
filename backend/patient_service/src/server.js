@@ -13,6 +13,8 @@ const { sequelize, connectMongo } = require('./models');
 const morgan = require('morgan');
 const patientRoutes = require('./routes/patient.routes');
 const medicalHistoryRoutes = require('./routes/medical.history.routes');
+const abhaRoutes = require('./routes/abha.routes');
+const searchRoutes = require('./routes/search.routes');
 
 // Load environment variables
 require('dotenv').config();
@@ -53,6 +55,8 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/patients', patientRoutes);
 app.use('/api/patients/medical-history', medicalHistoryRoutes);
+app.use('/api/patients/abha', abhaRoutes);
+app.use('/api/patients/search', searchRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
