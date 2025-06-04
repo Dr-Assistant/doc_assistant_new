@@ -21,6 +21,7 @@ const Schedule = React.lazy(() => import('../pages/Schedule/index'));
 const Patients = React.lazy(() => import('../pages/Patients/index'));
 const PatientDetail = React.lazy(() => import('../pages/Patients/PatientDetail'));
 const PatientForm = React.lazy(() => import('../pages/Patients/PatientForm'));
+const PreDiagnosisSummary = React.lazy(() => import('../pages/Patients/PreDiagnosisSummary'));
 const Tasks = React.lazy(() => import('../pages/Tasks'));
 const Encounters = React.lazy(() => import('../pages/Encounters'));
 const Consent = React.lazy(() => import('../pages/Consent'));
@@ -93,6 +94,14 @@ const AppRoutes: React.FC = () => {
               element={
                 <React.Suspense fallback={<LazyLoadingFallback />}>
                   <PatientForm />
+                </React.Suspense>
+              }
+            />
+            <Route
+              path=":id/pre-diagnosis"
+              element={
+                <React.Suspense fallback={<LazyLoadingFallback />}>
+                  <PreDiagnosisSummary />
                 </React.Suspense>
               }
             />

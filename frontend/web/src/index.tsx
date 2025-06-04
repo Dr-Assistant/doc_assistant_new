@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { ThemeProvider } from './context/ThemeContext';
 
 // Log when index.tsx is executed
 console.log('index.tsx is executing');
@@ -35,7 +36,11 @@ try {
   }
 
   // Render without StrictMode for simplicity
-  root.render(<App />);
+  root.render(
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  );
 
   console.log('App rendered');
 

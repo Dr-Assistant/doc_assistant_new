@@ -320,6 +320,36 @@ services:
     networks:
       - dr_assistant_network
 
+  pre_diagnosis_summary:
+    build:
+      context: ./ai_services/pre_diagnosis_summary
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_pre_diagnosis_summary
+    ports:
+      - "9004:9004"
+    environment:
+      NODE_ENV: development
+      PORT: 9004
+      MONGODB_URI: mongodb://mongo:mongo@mongodb:27017/dr_assistant
+      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-dummy_key}
+      GEMINI_MODEL: gemini-1.5-pro
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+      AUTH_SERVICE_URL: http://auth_service:8001
+      PATIENT_SERVICE_URL: http://patient_service:8007
+      ABDM_SERVICE_URL: http://abdm_integration:8101
+      USER_SERVICE_URL: http://user_service:8002
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001
+    volumes:
+      - ./ai_services/pre_diagnosis_summary:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+      - auth_service
+      - patient_service
+      - abdm_integration
+    networks:
+      - dr_assistant_network
+
   # Integration Services
   abdm_integration:
     build:

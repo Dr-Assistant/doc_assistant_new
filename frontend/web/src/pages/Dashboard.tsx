@@ -33,12 +33,16 @@ import TaskList from '../components/dashboard/TaskList';
 import AlertPanel from '../components/dashboard/AlertPanel';
 import MetricsDisplay from '../components/dashboard/MetricsDisplay';
 import QuickActions from '../components/dashboard/QuickActions';
+import PreDiagnosisSummaryList from '../components/patient/PreDiagnosisSummaryList';
 
 // Hooks and services
 import { useDashboard } from '../hooks/useDashboard';
 import type { Appointment, Task, Alert as DashboardAlert } from '../services/dashboard.service';
+import { PreDiagnosisSummary } from '../types/patient.types';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -118,6 +122,13 @@ const Dashboard: React.FC = () => {
     console.log('Quick action:', action);
     showSnackbar(`${action} feature coming soon!`, 'info');
     // TODO: Implement quick actions
+  };
+
+  const handlePreDiagnosisSummaryClick = (summary: PreDiagnosisSummary) => {
+    // Navigate to the patient's pre-diagnosis summary page
+    navigate(`/patients/${summary.patientId}/pre-diagnosis`, {
+      state: { summaryId: summary.id }
+    });
   };
 
   if (error) {
@@ -248,6 +259,16 @@ const Dashboard: React.FC = () => {
               onSearchPatient={() => handleQuickAction('Search Patient')}
               onVideoCall={() => handleQuickAction('Video Call')}
               onSettings={() => handleQuickAction('Settings')}
+            />
+          </Box>
+
+          {/* Urgent Pre-Diagnosis Summaries */}
+          <Box sx={{ mb: 3 }}>
+            <PreDiagnosisSummaryList
+              showUrgentOnly={true}
+              maxItems={3}
+              onSummaryClick={handlePreDiagnosisSummaryClick}
+              title="Urgent Pre-Diagnosis Summaries"
             />
           </Box>
 

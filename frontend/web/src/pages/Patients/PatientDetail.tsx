@@ -25,14 +25,16 @@ import {
   MedicalServices as MedicalServicesIcon,
   Event as EventIcon,
   Description as DescriptionIcon,
-  Security as SecurityIcon
+  Security as SecurityIcon,
+  Psychology as PsychologyIcon
 } from '@mui/icons-material';
 import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
 import PatientCard from './components/PatientCard';
 import MedicalHistoryForm from './components/MedicalHistoryForm';
 import { ConsentManagement } from '../../components/consent';
+import PreDiagnosisSummaryList from '../../components/patient/PreDiagnosisSummaryList';
 import patientService from '../../services/patient.service';
-import { Patient, MedicalHistory } from '../../types/patient.types';
+import { Patient, MedicalHistory, PreDiagnosisSummary } from '../../types/patient.types';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -271,6 +273,7 @@ const PatientDetailPage: React.FC = () => {
         >
           <Tab icon={<PersonIcon />} label="Profile" />
           <Tab icon={<MedicalServicesIcon />} label="Medical History" />
+          <Tab icon={<PsychologyIcon />} label="Pre-Diagnosis" />
           <Tab icon={<EventIcon />} label="Appointments" />
           <Tab icon={<DescriptionIcon />} label="Documents" />
           <Tab icon={<SecurityIcon />} label="ABDM Consent" />
@@ -295,18 +298,41 @@ const PatientDetailPage: React.FC = () => {
         </TabPanel>
 
         <TabPanel value={activeTab} index={2}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h6">Pre-Diagnosis Summaries</Typography>
+              <Button
+                variant="contained"
+                startIcon={<PsychologyIcon />}
+                onClick={() => navigate(`/patients/${patient.id}/pre-diagnosis`)}
+              >
+                Generate New Summary
+              </Button>
+            </Box>
+            <PreDiagnosisSummaryList
+              patientId={patient.id}
+              maxItems={5}
+              onSummaryClick={(summary: PreDiagnosisSummary) =>
+                navigate(`/patients/${patient.id}/pre-diagnosis`, { state: { summaryId: summary.id } })
+              }
+              title="Recent Summaries"
+            />
+          </Box>
+        </TabPanel>
+
+        <TabPanel value={activeTab} index={3}>
           <Typography variant="body1">
             Appointments feature will be implemented in a future update.
           </Typography>
         </TabPanel>
 
-        <TabPanel value={activeTab} index={3}>
+        <TabPanel value={activeTab} index={4}>
           <Typography variant="body1">
             Documents feature will be implemented in a future update.
           </Typography>
         </TabPanel>
 
-        <TabPanel value={activeTab} index={4}>
+        <TabPanel value={activeTab} index={5}>
           <ConsentManagement
             patientId={patient.id}
             showCreateButton={true}
