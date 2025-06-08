@@ -35,12 +35,8 @@ try {
     (window as any).debugLog('Root created, about to render App');
   }
 
-  // Render without StrictMode for simplicity
-  root.render(
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
-  );
+  // Render simplified version
+  root.render(<App />);
 
   console.log('App rendered');
 

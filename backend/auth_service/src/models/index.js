@@ -1,6 +1,17 @@
 const { Sequelize } = require('sequelize');
 const { logger } = require('../utils/logger');
 
+// Load environment variables explicitly
+require('dotenv').config();
+
+// Debug: Log the environment variables
+console.log('DB Configuration:', {
+  DB_HOST: process.env.DB_HOST,
+  DB_PORT: process.env.DB_PORT,
+  DB_NAME: process.env.DB_NAME,
+  DB_USER: process.env.DB_USER
+});
+
 // Initialize Sequelize with environment variables
 const sequelize = new Sequelize(
   process.env.DB_NAME || 'dr_assistant',
@@ -8,7 +19,7 @@ const sequelize = new Sequelize(
   process.env.DB_PASSWORD || 'postgres',
   {
     host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 5432,
+    port: parseInt(process.env.DB_PORT) || 5434,
     dialect: 'postgres',
     logging: (msg) => logger.debug(msg),
     pool: {

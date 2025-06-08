@@ -86,94 +86,160 @@ This repository contains documentation and development plans for the Dr. Assista
 
 ## Getting Started
 
-### Documentation
-
-Start by reviewing the documentation in the `/docs` folder to understand the project scope and plans:
-
-1. Read the product vision and features in `/docs/product`
-2. Review the system architecture in `/docs/development/architecture`
-3. Understand the development tickets in `/docs/development/MVP_Development_Tickets.md`
-
 ### Prerequisites
 
-- Node.js (v16+)
-- Docker and Docker Compose
-- PostgreSQL
-- MongoDB (optional for development)
-- Redis (optional for development)
+**Only Docker is required!** No need to install Node.js, PostgreSQL, MongoDB, or any other dependencies locally.
 
-### Development Setup
+- **Docker Desktop** - [Download here](https://docs.docker.com/desktop/)
+- **Git** - For cloning the repository
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Dr-Assistant/doc_assistant.git
-   cd doc_assistant
-   ```
+### 🚀 Quick Start (Docker - Recommended)
 
-2. Install dependencies for all services:
-   ```bash
-   # Use the provided script to install all dependencies
-   ./scripts/install-all.sh
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd doc_assistant_new
 
-   # Or install dependencies for specific services
-   cd backend/auth_service
-   npm install
-   cd ../..
+# Start the application (one command!)
+npm run start
 
-   cd frontend/web
-   npm install
-   cd ../..
-   ```
+# Or use the platform-specific scripts
+# For Linux/Mac:
+bash start.sh
 
-3. Set up environment variables:
-   ```bash
-   # Copy example environment files for all services
-   cp backend/auth_service/.env.example backend/auth_service/.env
-   cp backend/user_service/.env.example backend/user_service/.env
-   cp backend/patient_service/.env.example backend/patient_service/.env
-   cp backend/schedule_service/.env.example backend/schedule_service/.env
-   cp backend/api_gateway/.env.example backend/api_gateway/.env
-   cp ai_services/voice_transcription/.env.example ai_services/voice_transcription/.env
-   cp ai_services/clinical_note_generation/.env.example ai_services/clinical_note_generation/.env
-   cp integration_services/abdm_integration/.env.example integration_services/abdm_integration/.env
-   cp frontend/web/.env.example frontend/web/.env
+# For Windows:
+start.bat
+```
 
-   # Edit .env files with your configuration as needed
-   ```
+This will automatically:
+- ✅ Create .env file from template
+- ✅ Start all databases (PostgreSQL, MongoDB, Redis)
+- ✅ Start all backend services
+- ✅ Start AI services
+- ✅ Start frontend application
+- ✅ Set up networking between services
 
-4. Set up the database:
-   ```bash
-   # Start the database services
-   docker-compose up -d postgres mongodb redis
+### Alternative: Local Development (Advanced)
 
-   # Wait for the services to be ready
-   # You can check the status with:
-   docker-compose ps
-   ```
+If you prefer to run services locally with npm:
 
-5. Start the development environment:
-   ```bash
-   # Start all backend services
-   docker-compose up -d
+```bash
+# Start only databases with Docker
+npm run start:databases
 
-   # Or start specific services
-   docker-compose up -d auth_service user_service patient_service
+# Start services locally (requires Node.js 18+)
+npm run dev:local
+```
 
-   # Start the frontend development server
-   cd frontend/web
-   npm start
-   ```
+### Service URLs
 
-6. Access the application:
-   - Web Application: http://localhost:3000
-   - API Gateway: http://localhost:8000
-   - Auth Service: http://localhost:8001
-   - User Service: http://localhost:8002
-   - Patient Service: http://localhost:8003
-   - Schedule Service: http://localhost:8004
-   - Voice Transcription Service: http://localhost:9001
-   - Clinical Note Generation Service: http://localhost:9002
-   - ABDM Integration Service: http://localhost:8101
+Once started, access the application at:
+
+- **🌐 Frontend Web App**: http://localhost:3001
+- **🔗 API Gateway**: http://localhost:8000
+
+#### Backend Services
+- **🔐 Auth Service**: http://localhost:8020
+- **👤 User Service**: http://localhost:8012
+- **🎤 Voice Recording**: http://localhost:8013
+- **📅 Schedule Service**: http://localhost:8014
+- **📊 Dashboard Service**: http://localhost:8015
+- **🏥 Encounter Service**: http://localhost:8006
+- **🏥 Patient Service**: http://localhost:8017
+- **📋 Task Service**: http://localhost:8016
+
+#### AI Services
+- **🤖 Clinical Notes**: http://localhost:9002
+- **💊 Prescription Gen**: http://localhost:9003
+- **📋 Pre-Diagnosis**: http://localhost:9004
+
+#### Integration Services
+- **🏛️ ABDM Integration**: http://localhost:8101
+
+#### Databases
+- **🐘 PostgreSQL**: localhost:5432
+- **🍃 MongoDB**: localhost:27017
+- **🔴 Redis**: localhost:6379
+
+### 🛠️ Development Commands
+
+#### Main Commands
+```bash
+# Start all services
+npm run start
+
+# Stop all services
+npm run stop
+
+# Restart all services
+npm run restart
+
+# Start with fresh builds
+npm run start:build
+
+# View status of all services
+npm run status
+```
+
+#### Selective Service Management
+```bash
+# Start only databases
+npm run start:databases
+
+# Start backend services (includes databases)
+npm run start:backend
+
+# Start AI services
+npm run start:ai
+
+# Start frontend
+npm run start:frontend
+```
+
+#### Logs and Monitoring
+```bash
+# View all logs
+npm run logs
+
+# View database logs
+npm run logs:databases
+
+# View backend service logs
+npm run logs:backend
+
+# View AI service logs
+npm run logs:ai
+
+# View frontend logs
+npm run logs:frontend
+
+# Check health of core services
+npm run health
+```
+
+#### Cleanup Commands
+```bash
+# Clean containers and images
+npm run clean
+
+# Clean including volumes (removes all data)
+npm run clean:volumes
+
+# Complete cleanup (containers, images, volumes, node_modules)
+npm run clean:all
+```
+
+#### Development Tools
+```bash
+# Run tests across all services
+npm test
+
+# Run linting across all services
+npm run lint
+
+# Build all services
+npm run build
+```
 
 ### Running Tests
 

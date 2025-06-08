@@ -1,0 +1,82 @@
+{
+  "name": "dr-assistant",
+  "version": "1.0.0",
+  "description": "Dr. Assistant - AI-powered healthcare management system",
+  "private": true,
+  "workspaces": [
+    "frontend/web",
+    "backend/auth_service",
+    "backend/user_service",
+    "backend/patient_service",
+    "backend/schedule_service",
+    "backend/dashboard_service",
+    "backend/task_service",
+    "backend/voice_recording_service",
+    "backend/encounter_service",
+    "backend/document_service",
+    "backend/notification_service",
+    "backend/search_service",
+    "backend/analytics_service",
+    "backend/api_gateway",
+    "ai_services/clinical_note_generation",
+    "ai_services/prescription_generation",
+    "ai_services/pre_diagnosis_summary",
+    "integration_services/abdm_integration",
+    "integration_services/ehr_integration",
+    "integration_services/lab_integration",
+    "integration_services/pharmacy_integration"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm run install:workspaces",
+    "install:workspaces": "npm install --workspaces",
+    "setup": "npm run install:all && npm run setup:env",
+    "setup:env": "node scripts/setup-env.js",
+    "start": "docker-compose up -d",
+    "stop": "docker-compose down",
+    "restart": "npm run stop && npm run start",
+    "start:build": "docker-compose up -d --build",
+    "start:databases": "docker-compose up -d postgres mongodb redis",
+    "stop:databases": "docker-compose stop postgres mongodb redis",
+    "start:backend": "docker-compose up -d postgres mongodb redis auth_service user_service patient_service schedule_service dashboard_service task_service voice_recording_service encounter_service",
+    "start:ai": "docker-compose up -d clinical_note_generation prescription_generation pre_diagnosis_summary",
+    "start:frontend": "docker-compose up -d frontend_web",
+    "logs": "docker-compose logs -f",
+    "logs:databases": "docker-compose logs -f postgres mongodb redis",
+    "logs:backend": "docker-compose logs -f auth_service user_service patient_service schedule_service dashboard_service task_service voice_recording_service encounter_service",
+    "logs:ai": "docker-compose logs -f clinical_note_generation prescription_generation pre_diagnosis_summary",
+    "logs:frontend": "docker-compose logs -f frontend_web",
+    "status": "docker-compose ps",
+    "clean": "npm run stop && docker system prune -f && npm run clean:node_modules",
+    "clean:node_modules": "find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +",
+    "clean:volumes": "docker-compose down -v",
+    "clean:all": "npm run clean:volumes && docker system prune -af && npm run clean:node_modules",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "build": "npm run build --workspaces",
+    "dev:local": "bash scripts/start-local-only.sh",
+    "health": "docker-compose exec postgres pg_isready && docker-compose exec mongodb mongosh --eval 'db.runCommand(\"ping\")' && docker-compose exec redis redis-cli ping"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.5.0"
+  },
+  "keywords": [
+    "healthcare",
+    "ai",
+    "doctor",
+    "assistant",
+    "medical",
+    "microservices"
+  ],
+  "author": "Dr. Assistant Team",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/dr-assistant.git"
+  }
+}

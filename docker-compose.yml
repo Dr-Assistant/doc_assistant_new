@@ -6,40 +6,58 @@ services:
     image: postgres:14
     container_name: dr_assistant_postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: dr_assistant
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-dr_assistant}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - dr_assistant_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   mongodb:
     image: mongo:5
     container_name: dr_assistant_mongodb
     environment:
-      MONGO_INITDB_ROOT_USERNAME: mongo
-      MONGO_INITDB_ROOT_PASSWORD: mongo
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-mongo}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-mongo}
     ports:
-      - "27018:27017"
+      - "${MONGO_PORT:-27017}:27017"
     volumes:
       - mongodb_data:/data/db
     networks:
       - dr_assistant_network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/dr_assistant --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   redis:
     image: redis:6
     container_name: dr_assistant_redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     networks:
       - dr_assistant_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
-  # API Gateway
+  # API Gateway (commented out - not implemented yet)
   # api_gateway:
   #   build:
   #     context: ./backend/api_gateway
@@ -49,13 +67,31 @@ services:
   #     - "8000:8000"
   #   environment:
   #     NODE_ENV: development
+  #     PORT: 8000
+  #     AUTH_SERVICE_URL: http://auth_service:8001
+  #     USER_SERVICE_URL: http://user_service:8002
+  #     PATIENT_SERVICE_URL: http://patient_service:8007
+  #     SCHEDULE_SERVICE_URL: http://schedule_service:8004
+  #     DASHBOARD_SERVICE_URL: http://dashboard_service:8005
+  #     TASK_SERVICE_URL: http://task_service:8016
+  #     VOICE_RECORDING_SERVICE_URL: http://voice_recording_service:8003
+  #     ENCOUNTER_SERVICE_URL: http://encounter_service:8006
+  #     CLINICAL_NOTE_SERVICE_URL: http://clinical_note_generation:9002
+  #     PRESCRIPTION_SERVICE_URL: http://prescription_generation:9003
+  #     PRE_DIAGNOSIS_SERVICE_URL: http://pre_diagnosis_summary:9004
+  #     ABDM_INTEGRATION_URL: http://abdm_integration:8101
+  #     JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+  #     CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
   #   volumes:
   #     - ./backend/api_gateway:/app
   #     - /app/node_modules
   #   depends_on:
   #     - auth_service
+  #     - user_service
+  #     - patient_service
   #   networks:
   #     - dr_assistant_network
+  #   restart: unless-stopped
 
   # Core Services
   auth_service:
@@ -64,25 +100,34 @@ services:
       dockerfile: Dockerfile.dev
     container_name: dr_assistant_auth_service
     ports:
-      - "8001:8001"
+      - "8020:8020"
     environment:
       NODE_ENV: development
+      PORT: 8020
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: dr_assistant
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-dr_assistant}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_URI: redis://redis:6379
+      USER_SERVICE_URL: http://user_service:8012
       JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      REFRESH_TOKEN_EXPIRES_IN: ${REFRESH_TOKEN_EXPIRES_IN:-7d}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./backend/auth_service:/app
       - /app/node_modules
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - dr_assistant_network
+    restart: unless-stopped
 
   user_service:
     build:
@@ -90,23 +135,29 @@ services:
       dockerfile: Dockerfile.dev
     container_name: dr_assistant_user_service
     ports:
-      - "8002:8002"
+      - "8012:8012"
     environment:
       NODE_ENV: development
+      PORT: 8012
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: dr_assistant
-      AUTH_SERVICE_URL: http://auth_service:8001
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-dr_assistant}
+      AUTH_SERVICE_URL: http://auth_service:8020
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./backend/user_service:/app
       - /app/node_modules
     depends_on:
-      - postgres
-      - auth_service
+      postgres:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
     networks:
       - dr_assistant_network
+    restart: unless-stopped
 
   patient_service:
     build:
@@ -114,27 +165,35 @@ services:
       dockerfile: Dockerfile.dev
     container_name: dr_assistant_patient_service
     ports:
-      - "8007:8007"
+      - "8017:8017"
     environment:
       NODE_ENV: development
+      PORT: 8017
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: dr_assistant
-      MONGODB_URI: mongodb://mongo:mongo@mongodb:27017/dr_assistant
-      AUTH_SERVICE_URL: http://auth_service:8001
-      USER_SERVICE_URL: http://user_service:8002
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-dr_assistant}
+      MONGODB_URI: mongodb://${MONGO_USER:-mongo}:${MONGO_PASSWORD:-mongo}@mongodb:27017/${MONGO_DB:-dr_assistant}?authSource=admin
+      AUTH_SERVICE_URL: http://auth_service:8020
+      USER_SERVICE_URL: http://user_service:8012
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./backend/patient_service:/app
       - /app/node_modules
     depends_on:
-      - postgres
-      - mongodb
-      - auth_service
-      - user_service
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+      user_service:
+        condition: service_started
     networks:
       - dr_assistant_network
+    restart: unless-stopped
 
   schedule_service:
     build:
@@ -142,25 +201,40 @@ services:
       dockerfile: Dockerfile.dev
     container_name: dr_assistant_schedule_service
     ports:
-      - "8004:8004"
+      - "8014:8014"
     environment:
       NODE_ENV: development
+      PORT: 8014
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: dr_assistant
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-dr_assistant}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_URI: redis://redis:6379
+      AUTH_SERVICE_URL: http://auth_service:8020
+      USER_SERVICE_URL: http://user_service:8012
+      PATIENT_SERVICE_URL: http://patient_service:8017
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./backend/schedule_service:/app
       - /app/node_modules
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+      user_service:
+        condition: service_started
+      patient_service:
+        condition: service_started
     networks:
       - dr_assistant_network
+    restart: unless-stopped
 
   dashboard_service:
     build:
@@ -168,27 +242,37 @@ services:
       dockerfile: Dockerfile.dev
     container_name: dr_assistant_dashboard_service
     ports:
-      - "8005:8005"
+      - "8015:8015"
     environment:
       NODE_ENV: development
+      PORT: 8015
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_URI: redis://redis:6379
-      AUTH_SERVICE_URL: http://auth_service:8001
-      USER_SERVICE_URL: http://user_service:8002
-      PATIENT_SERVICE_URL: http://patient_service:8007
-      SCHEDULE_SERVICE_URL: http://schedule_service:8004
+      AUTH_SERVICE_URL: http://auth_service:8020
+      USER_SERVICE_URL: http://user_service:8012
+      PATIENT_SERVICE_URL: http://patient_service:8017
+      SCHEDULE_SERVICE_URL: http://schedule_service:8014
+      TASK_SERVICE_URL: http://task_service:8016
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./backend/dashboard_service:/app
       - /app/node_modules
     depends_on:
-      - redis
-      - auth_service
-      - user_service
-      - patient_service
-      - schedule_service
+      redis:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+      user_service:
+        condition: service_started
+      patient_service:
+        condition: service_started
+      schedule_service:
+        condition: service_started
     networks:
       - dr_assistant_network
+    restart: unless-stopped
 
   task_service:
     build:
@@ -199,107 +283,97 @@ services:
       - "8016:8016"
     environment:
       NODE_ENV: development
+      PORT: 8016
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: dr_assistant
-      AUTH_SERVICE_URL: http://auth_service:8001
-      USER_SERVICE_URL: http://user_service:8002
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-dr_assistant}
+      AUTH_SERVICE_URL: http://auth_service:8020
+      USER_SERVICE_URL: http://user_service:8012
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./backend/task_service:/app
       - /app/node_modules
     depends_on:
-      - postgres
-      - auth_service
-      - user_service
+      postgres:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+      user_service:
+        condition: service_started
     networks:
       - dr_assistant_network
+    restart: unless-stopped
 
-  # Sprint 4 Services
   voice_recording_service:
     build:
       context: ./backend/voice_recording_service
       dockerfile: Dockerfile.dev
     container_name: dr_assistant_voice_recording_service
     ports:
-      - "8003:8003"
+      - "8013:8013"
     environment:
       NODE_ENV: development
-      MONGODB_URI: mongodb://mongo:mongo@mongodb:27017/dr_assistant
-      AUTH_SERVICE_URL: http://auth_service:8001
+      PORT: 8013
+      MONGODB_URI: mongodb://${MONGO_USER:-mongo}:${MONGO_PASSWORD:-mongo}@mongodb:27017/${MONGO_DB:-dr_assistant}?authSource=admin
+      AUTH_SERVICE_URL: http://auth_service:8020
       GOOGLE_SPEECH_API_KEY: ${GOOGLE_SPEECH_API_KEY:-dummy_key}
       JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./backend/voice_recording_service:/app
       - /app/node_modules
     depends_on:
-      - mongodb
-      - auth_service
+      mongodb:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
     networks:
       - dr_assistant_network
+    restart: unless-stopped
 
-  prescription_generation_service:
+  encounter_service:
     build:
-      context: ./ai_services/prescription_generation
+      context: ./backend/encounter_service
       dockerfile: Dockerfile.dev
-    container_name: dr_assistant_prescription_generation
+    container_name: dr_assistant_encounter_service
     ports:
-      - "9003:9003"
+      - "8006:8006"
     environment:
       NODE_ENV: development
-      MONGODB_URI: mongodb://mongo:mongo@mongodb:27017/dr_assistant
-      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-dummy_key}
-      AUTH_SERVICE_URL: http://auth_service:8001
-      CLINICAL_NOTE_SERVICE_URL: http://clinical_note_generation:9002
-      PATIENT_SERVICE_URL: http://patient_service:8007
+      PORT: 8006
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-dr_assistant}
+      MONGODB_URI: mongodb://${MONGO_USER:-mongo}:${MONGO_PASSWORD:-mongo}@mongodb:27017/${MONGO_DB:-dr_assistant}?authSource=admin
+      AUTH_SERVICE_URL: http://auth_service:8020
+      USER_SERVICE_URL: http://user_service:8012
+      PATIENT_SERVICE_URL: http://patient_service:8017
       JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
-      - ./ai_services/prescription_generation:/app
+      - ./backend/encounter_service:/app
       - /app/node_modules
     depends_on:
-      - mongodb
-      - auth_service
-      - clinical_note_generation
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+      user_service:
+        condition: service_started
+      patient_service:
+        condition: service_started
     networks:
       - dr_assistant_network
-
-  # Frontend
-  frontend_web:
-    build:
-      context: ./frontend/web
-      dockerfile: Dockerfile.dev
-    container_name: dr_assistant_frontend_web
-    ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: development
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_AUTH_SERVICE_URL: http://localhost:8001
-      REACT_APP_VOICE_RECORDING_SERVICE_URL: http://localhost:8003
-      REACT_APP_ENABLE_VOICE_RECORDING: true
-      REACT_APP_ENABLE_AI_TRANSCRIPTION: true
-    volumes:
-      - ./frontend/web:/app
-      - /app/node_modules
-    networks:
-      - dr_assistant_network
+    restart: unless-stopped
 
   # AI Services
-  # voice_transcription:
-  #   build:
-  #     context: ./ai_services/voice_transcription
-  #     dockerfile: Dockerfile.dev
-  #   container_name: dr_assistant_voice_transcription
-  #   ports:
-  #     - "9001:9001"
-  #   environment:
-  #     PYTHONUNBUFFERED: 1
-  #   volumes:
-  #     - ./ai_services/voice_transcription:/app
-  #   networks:
-  #     - dr_assistant_network
-
   clinical_note_generation:
     build:
       context: ./ai_services/clinical_note_generation
@@ -309,16 +383,57 @@ services:
       - "9002:9002"
     environment:
       NODE_ENV: development
-      PYTHONUNBUFFERED: 1
-      MONGODB_URI: mongodb://mongo:mongo@mongodb:27017/dr_assistant
+      PORT: 9002
+      MONGODB_URI: mongodb://${MONGO_USER:-mongo}:${MONGO_PASSWORD:-mongo}@mongodb:27017/${MONGO_DB:-dr_assistant}?authSource=admin
       GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-dummy_key}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-pro}
       JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+      AUTH_SERVICE_URL: http://auth_service:8020
+      PATIENT_SERVICE_URL: http://patient_service:8017
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./ai_services/clinical_note_generation:/app
+      - /app/node_modules
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
     networks:
       - dr_assistant_network
+    restart: unless-stopped
+
+  prescription_generation:
+    build:
+      context: ./ai_services/prescription_generation
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_prescription_generation
+    ports:
+      - "9003:9003"
+    environment:
+      NODE_ENV: development
+      PORT: 9003
+      MONGODB_URI: mongodb://${MONGO_USER:-mongo}:${MONGO_PASSWORD:-mongo}@mongodb:27017/${MONGO_DB:-dr_assistant}?authSource=admin
+      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-dummy_key}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-pro}
+      AUTH_SERVICE_URL: http://auth_service:8020
+      CLINICAL_NOTE_SERVICE_URL: http://clinical_note_generation:9002
+      PATIENT_SERVICE_URL: http://patient_service:8017
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - ./ai_services/prescription_generation:/app
+      - /app/node_modules
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+      clinical_note_generation:
+        condition: service_started
+    networks:
+      - dr_assistant_network
+    restart: unless-stopped
 
   pre_diagnosis_summary:
     build:
@@ -330,25 +445,31 @@ services:
     environment:
       NODE_ENV: development
       PORT: 9004
-      MONGODB_URI: mongodb://mongo:mongo@mongodb:27017/dr_assistant
+      MONGODB_URI: mongodb://${MONGO_USER:-mongo}:${MONGO_PASSWORD:-mongo}@mongodb:27017/${MONGO_DB:-dr_assistant}?authSource=admin
       GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-dummy_key}
-      GEMINI_MODEL: gemini-1.5-pro
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-pro}
       JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
-      AUTH_SERVICE_URL: http://auth_service:8001
-      PATIENT_SERVICE_URL: http://patient_service:8007
+      AUTH_SERVICE_URL: http://auth_service:8020
+      PATIENT_SERVICE_URL: http://patient_service:8017
       ABDM_SERVICE_URL: http://abdm_integration:8101
-      USER_SERVICE_URL: http://user_service:8002
-      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001
+      USER_SERVICE_URL: http://user_service:8012
+      ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./ai_services/pre_diagnosis_summary:/app
       - /app/node_modules
     depends_on:
-      - mongodb
-      - auth_service
-      - patient_service
-      - abdm_integration
+      mongodb:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+      patient_service:
+        condition: service_started
+      abdm_integration:
+        condition: service_started
     networks:
       - dr_assistant_network
+    restart: unless-stopped
 
   # Integration Services
   abdm_integration:
@@ -360,17 +481,66 @@ services:
       - "8101:8101"
     environment:
       NODE_ENV: development
+      PORT: 8101
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: dr_assistant
-      AUTH_SERVICE_URL: http://auth_service:8001
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-dr_assistant}
+      AUTH_SERVICE_URL: http://auth_service:8020
+      PATIENT_SERVICE_URL: http://patient_service:8017
+      USER_SERVICE_URL: http://user_service:8012
+      # ABDM Configuration
+      ABDM_BASE_URL: ${ABDM_BASE_URL:-https://dev.abdm.gov.in/gateway}
+      ABDM_CLIENT_ID: ${ABDM_CLIENT_ID:-dummy_client_id}
+      ABDM_CLIENT_SECRET: ${ABDM_CLIENT_SECRET:-dummy_client_secret}
+      ABDM_AUTH_URL: ${ABDM_AUTH_URL:-https://dev.abdm.gov.in/gateway/v0.5/sessions}
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - ./integration_services/abdm_integration:/app
       - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
     networks:
       - dr_assistant_network
+    restart: unless-stopped
+
+  # Frontend
+  frontend_web:
+    build:
+      context: ./frontend/web
+      dockerfile: Dockerfile.dev
+    container_name: dr_assistant_frontend_web
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_AUTH_SERVICE_URL: http://localhost:8020
+      REACT_APP_USER_SERVICE_URL: http://localhost:8012
+      REACT_APP_VOICE_RECORDING_SERVICE_URL: http://localhost:8013
+      REACT_APP_PATIENT_SERVICE_URL: http://localhost:8017
+      REACT_APP_SCHEDULE_SERVICE_URL: http://localhost:8014
+      REACT_APP_DASHBOARD_SERVICE_URL: http://localhost:8015
+      REACT_APP_TASK_SERVICE_URL: http://localhost:8016
+      REACT_APP_CLINICAL_NOTE_SERVICE_URL: http://localhost:9002
+      REACT_APP_PRESCRIPTION_SERVICE_URL: http://localhost:9003
+      REACT_APP_PRE_DIAGNOSIS_SERVICE_URL: http://localhost:9004
+      REACT_APP_ABDM_INTEGRATION_URL: http://localhost:8101
+      REACT_APP_ENABLE_VOICE_RECORDING: ${ENABLE_VOICE_RECORDING:-true}
+      REACT_APP_ENABLE_AI_TRANSCRIPTION: ${ENABLE_AI_TRANSCRIPTION:-true}
+    volumes:
+      - ./frontend/web:/app
+      - /app/node_modules
+    depends_on:
+      - auth_service
+    networks:
+      - dr_assistant_network
+    restart: unless-stopped
 
 networks:
   dr_assistant_network:

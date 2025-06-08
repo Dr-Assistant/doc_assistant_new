@@ -47,7 +47,8 @@ declare -a SERVICE_NAMES=()
 # Function to check if a port is in use
 check_port() {
     local port=$1
-    if nc -z localhost $port >/dev/null 2>&1; then
+    # Use PowerShell Test-NetConnection for Windows compatibility
+    if powershell.exe -Command "Test-NetConnection -ComputerName localhost -Port $port -InformationLevel Quiet" 2>/dev/null; then
         return 0  # Port is in use
     else
         return 1  # Port is free
@@ -58,7 +59,7 @@ check_port() {
 wait_for_service() {
     local service_name=$1
     local port=$2
-    local max_attempts=30
+    local max_attempts=15  # Reduced attempts for faster startup
     local attempt=1
 
     print_status "Waiting for $service_name to be ready on port $port..."
@@ -74,8 +75,8 @@ wait_for_service() {
         attempt=$((attempt + 1))
     done
 
-    print_error "$service_name failed to start on port $port after $max_attempts attempts"
-    return 1
+    print_warning "$service_name may not be ready yet on port $port (continuing with other services)"
+    return 1  # Return 1 but don't exit the script
 }
 
 # Function to start a service
@@ -106,15 +107,15 @@ start_service() {
         export PORT=$port
         export NODE_ENV=development
         export DB_HOST=localhost
-        export DB_PORT=5434
+        export DB_PORT=${DB_PORT:-5434}
         export DB_NAME=dr_assistant
         export DB_USER=postgres
         export DB_PASSWORD=postgres
         export JWT_SECRET=your_jwt_secret_key_here_for_local_dev
         export REDIS_HOST=localhost
-        export REDIS_PORT=6380
-        export REDIS_URI=redis://localhost:6380
-        export MONGODB_URI=mongodb://localhost:27019/dr_assistant
+        export REDIS_PORT=${REDIS_PORT:-6380}
+        export REDIS_URI=${REDIS_URI:-redis://localhost:6380}
+        export MONGODB_URI=${MONGODB_URI:-mongodb://localhost:27019/dr_assistant}
         export AUTH_SERVICE_URL=http://localhost:8020
         export USER_SERVICE_URL=http://localhost:8012
         export PATIENT_SERVICE_URL=http://localhost:8017
@@ -122,6 +123,15 @@ start_service() {
         export VOICE_RECORDING_SERVICE_URL=http://localhost:8013
         export DASHBOARD_SERVICE_URL=http://localhost:8015
         export TASK_SERVICE_URL=http://localhost:8016
+
+        # AI Services
+        export CLINICAL_NOTE_SERVICE_URL=http://localhost:9002
+        export PRESCRIPTION_SERVICE_URL=http://localhost:9003
+        export PRE_DIAGNOSIS_SERVICE_URL=http://localhost:9004
+        export VOICE_TRANSCRIPTION_SERVICE_URL=http://localhost:9001
+
+        # Integration Services
+        export ABDM_INTEGRATION_URL=http://localhost:8101
 
         # ABDM Integration specific environment variables (dummy values for local dev)
         export ABDM_BASE_URL=https://dev.abdm.gov.in/gateway
@@ -132,6 +142,11 @@ start_service() {
         export HEALTH_RECORD_CALLBACK_URL=http://localhost:8101/api/abdm/health-records/callback
         export TOKEN_ENCRYPTION_KEY=dummy_token_encryption_key_32_chars
         export DATA_ENCRYPTION_KEY=dummy_data_encryption_key_32_chars
+
+        # API Keys (dummy values for local dev)
+        export GOOGLE_SPEECH_API_KEY=dummy_google_speech_api_key
+        export GOOGLE_GEMINI_API_KEY=dummy_google_gemini_api_key
+        export GEMINI_MODEL=gemini-1.5-pro
     fi
 
     if [ "$service_name" = "frontend-web" ]; then
@@ -148,9 +163,9 @@ start_service() {
 
     print_info "$service_name started with PID $pid (logs: logs/${service_name}.log)"
 
-    # Wait for service to be ready
+    # Wait for service to be ready (but continue even if it fails)
     if [ -n "$port" ]; then
-        wait_for_service "$service_name" "$port"
+        wait_for_service "$service_name" "$port" || true  # Continue even if wait fails
     fi
 }
 
@@ -188,31 +203,57 @@ mkdir -p logs
 
 # Check if databases are available
 print_status "🔍 Checking database availability..."
+
+# Check PostgreSQL (primary port 5434)
 if check_port 5434; then
     print_success "PostgreSQL found on port 5434"
+    export DB_PORT=5434
 elif check_port 5433; then
     print_success "PostgreSQL found on port 5433"
+    export DB_PORT=5433
 elif check_port 5432; then
     print_success "PostgreSQL found on port 5432"
+    export DB_PORT=5432
 else
-    print_error "PostgreSQL not found on any expected port (5432, 5433, 5434)"
-    exit 1
+    print_warning "PostgreSQL not found on any expected port (5432, 5433, 5434)"
+    print_info "Starting databases with Docker..."
+    docker-compose -f docker-compose.databases.yml up -d
+    sleep 10
+    if check_port 5434; then
+        print_success "PostgreSQL started on port 5434"
+        export DB_PORT=5434
+    else
+        print_error "Failed to start PostgreSQL"
+        exit 1
+    fi
 fi
 
+# Check MongoDB (primary port 27019)
 if check_port 27019; then
     print_success "MongoDB found on port 27019"
+    export MONGODB_PORT=27019
+    export MONGODB_URI="mongodb://localhost:27019/dr_assistant"
 elif check_port 27018; then
     print_success "MongoDB found on port 27018"
+    export MONGODB_PORT=27018
+    export MONGODB_URI="mongodb://localhost:27018/dr_assistant"
 elif check_port 27017; then
     print_success "MongoDB found on port 27017"
+    export MONGODB_PORT=27017
+    export MONGODB_URI="mongodb://localhost:27017/dr_assistant"
 else
     print_warning "MongoDB not found on expected ports"
 fi
 
+# Check Redis (primary port 6380)
 if check_port 6380; then
     print_success "Redis found on port 6380"
+    export REDIS_PORT=6380
+    export REDIS_URI="redis://localhost:6380"
 elif check_port 6379; then
     print_success "Redis found on port 6379"
+    export REDIS_PORT=6379
+    export REDIS_URI="redis://localhost:6379"
 else
     print_warning "Redis not found on expected ports"
 fi
@@ -221,6 +262,7 @@ fi
 print_status "🔧 Starting backend services..."
 
 # Core backend services (using different ports to avoid Docker conflicts)
+print_status "Starting core backend services..."
 start_service "auth-service" "backend/auth_service" "8020"
 start_service "user-service" "backend/user_service" "8012"
 start_service "voice-recording-service" "backend/voice_recording_service" "8013"
