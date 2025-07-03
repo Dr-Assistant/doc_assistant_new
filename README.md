@@ -1,4 +1,4 @@
-# Dr. Assistant - AI-Powered Healthcare Solution
+# Dr. Assistant - AI-Powered Healthcare Solution( in-progress )
 
 Dr. Assistant is an AI-powered application designed to streamline doctor workflows, reduce administrative burden, and improve patient care in the Indian healthcare system. The platform uses voice recognition, AI summarization, and intelligent scheduling to help doctors focus more on patients and less on paperwork.
 
